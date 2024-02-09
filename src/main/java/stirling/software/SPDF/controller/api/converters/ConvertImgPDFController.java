@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import io.github.pixee.security.Filenames;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
@@ -54,9 +55,11 @@ public class ConvertImgPDFController {
             colorTypeResult = ImageType.BINARY;
         }
         // returns bytes for image
-        boolean singleImage = singleOrMultiple.equals("single");
+        boolean singleImage = "single".equals(singleOrMultiple);
         byte[] result = null;
-        String filename = file.getOriginalFilename().replaceFirst("[.][^.]+$", "");
+        String filename =
+                Filenames.toSimpleFileName(file.getOriginalFilename())
+                        .replaceFirst("[.][^.]+$", "");
         try {
             result =
                     PdfUtils.convertFromPdf(
@@ -113,6 +116,6 @@ public class ConvertImgPDFController {
 
     private String getMediaType(String imageFormat) {
         String mimeType = URLConnection.guessContentTypeFromName("." + imageFormat);
-        return mimeType.equals("null") ? "application/octet-stream" : mimeType;
+        return "null".equals(mimeType) ? "application/octet-stream" : mimeType;
     }
 }

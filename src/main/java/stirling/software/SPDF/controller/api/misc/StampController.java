@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
 
 import javax.imageio.ImageIO;
 
@@ -31,6 +32,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import io.github.pixee.security.Filenames;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
@@ -63,6 +65,7 @@ public class StampController {
 
         String customColor = request.getCustomColor();
         float marginFactor;
+
         switch (request.getCustomMargin().toLowerCase()) {
             case "small":
                 marginFactor = 0.02f;
@@ -76,7 +79,6 @@ public class StampController {
             case "x-large":
                 marginFactor = 0.075f;
                 break;
-
             default:
                 marginFactor = 0.035f;
                 break;
@@ -86,6 +88,9 @@ public class StampController {
         PDDocument document = Loader.loadPDF(pdfFile.getBytes());
 
         for (PDPage page : document.getPages()) {
+            PDRectangle pageSize = page.getMediaBox();
+            float margin = marginFactor * (pageSize.getWidth() + pageSize.getHeight()) / 2;
+
             PDPageContentStream contentStream =
                     new PDPageContentStream(
                             document, page, PDPageContentStream.AppendMode.APPEND, true, true);
@@ -94,7 +99,7 @@ public class StampController {
             graphicsState.setNonStrokingAlphaConstant(opacity);
             contentStream.setGraphicsStateParameters(graphicsState);
 
-            if (watermarkType.equalsIgnoreCase("text")) {
+            if ("text".equalsIgnoreCase(watermarkType)) {
                 addTextStamp(
                         contentStream,
                         watermarkText,
@@ -106,9 +111,9 @@ public class StampController {
                         alphabet,
                         overrideX,
                         overrideY,
-                        marginFactor,
+                        margin,
                         customColor);
-            } else if (watermarkType.equalsIgnoreCase("image")) {
+            } else if ("image".equalsIgnoreCase(watermarkType)) {
                 addImageStamp(
                         contentStream,
                         watermarkImage,
@@ -119,7 +124,7 @@ public class StampController {
                         fontSize,
                         overrideX,
                         overrideY,
-                        marginFactor);
+                        margin);
             }
 
             contentStream.close();
@@ -127,7 +132,9 @@ public class StampController {
 
         return WebResponseUtils.pdfDocToWebResponse(
                 document,
-                pdfFile.getOriginalFilename().replaceFirst("[.][^.]+$", "") + "_watermarked.pdf");
+                Filenames.toSimpleFileName(pdfFile.getOriginalFilename())
+                                .replaceFirst("[.][^.]+$", "")
+                        + "_watermarked.pdf");
     }
 
     private void addTextStamp(
@@ -141,7 +148,7 @@ public class StampController {
             String alphabet,
             float overrideX, // X override
             float overrideY,
-            float marginFactor,
+            float margin,
             String colorString) // Y override
             throws IOException {
         String resourceDir = "";
@@ -165,10 +172,10 @@ public class StampController {
                 break;
         }
 
-        if (!resourceDir.equals("")) {
+        if (!"".equals(resourceDir)) {
             ClassPathResource classPathResource = new ClassPathResource(resourceDir);
             String fileExtension = resourceDir.substring(resourceDir.lastIndexOf("."));
-            File tempFile = File.createTempFile("NotoSansFont", fileExtension);
+            File tempFile = Files.createTempFile("NotoSansFont", fileExtension).toFile();
             try (InputStream is = classPathResource.getInputStream();
                     FileOutputStream os = new FileOutputStream(tempFile)) {
                 IOUtils.copy(is, os);
@@ -203,14 +210,10 @@ public class StampController {
         } else {
             x =
                     calculatePositionX(
-                            pageSize,
-                            position,
-                            fontSize,
-                            font,
-                            fontSize,
-                            watermarkText,
-                            marginFactor);
-            y = calculatePositionY(pageSize, position, fontSize, marginFactor);
+                            pageSize, position, fontSize, font, fontSize, watermarkText, margin);
+            y =
+                    calculatePositionY(
+                            pageSize, position, calculateTextCapHeight(font, fontSize), margin);
         }
 
         contentStream.beginText();
@@ -229,7 +232,7 @@ public class StampController {
             float fontSize,
             float overrideX,
             float overrideY,
-            float marginFactor)
+            float margin)
             throws IOException {
 
         // Load the watermark image
@@ -255,10 +258,8 @@ public class StampController {
             x = overrideX;
             y = overrideY;
         } else {
-            x =
-                    calculatePositionX(
-                            pageSize, position, desiredPhysicalWidth, null, 0, null, marginFactor);
-            y = calculatePositionY(pageSize, position, fontSize, marginFactor);
+            x = calculatePositionX(pageSize, position, desiredPhysicalWidth, null, 0, null, margin);
+            y = calculatePositionY(pageSize, position, fontSize, margin);
         }
 
         contentStream.saveGraphicsState();
@@ -275,17 +276,31 @@ public class StampController {
             PDFont font,
             float fontSize,
             String text,
-            float marginFactor)
+            float margin)
             throws IOException {
         float actualWidth =
                 (text != null) ? calculateTextWidth(text, font, fontSize) : contentWidth;
         switch (position % 3) {
             case 1: // Left
-                return pageSize.getLowerLeftX() + marginFactor * pageSize.getWidth();
+                return pageSize.getLowerLeftX() + margin;
             case 2: // Center
                 return (pageSize.getWidth() - actualWidth) / 2;
             case 0: // Right
-                return pageSize.getUpperRightX() - actualWidth - marginFactor * pageSize.getWidth();
+                return pageSize.getUpperRightX() - actualWidth - margin;
+            default:
+                return 0;
+        }
+    }
+
+    private float calculatePositionY(
+            PDRectangle pageSize, int position, float height, float margin) {
+        switch ((position - 1) / 3) {
+            case 0: // Top
+                return pageSize.getUpperRightY() - height - margin;
+            case 1: // Middle
+                return (pageSize.getHeight() - height) / 2;
+            case 2: // Bottom
+                return pageSize.getLowerLeftY() + margin;
             default:
                 return 0;
         }
@@ -295,17 +310,7 @@ public class StampController {
         return font.getStringWidth(text) / 1000 * fontSize;
     }
 
-    private float calculatePositionY(
-            PDRectangle pageSize, int position, float height, float marginFactor) {
-        switch ((position - 1) / 3) {
-            case 0: // Top
-                return pageSize.getUpperRightY() - height - marginFactor * pageSize.getHeight();
-            case 1: // Middle
-                return (pageSize.getHeight() - height) / 2;
-            case 2: // Bottom
-                return pageSize.getLowerLeftY() + marginFactor * pageSize.getHeight();
-            default:
-                return 0;
-        }
+    private float calculateTextCapHeight(PDFont font, float fontSize) {
+        return font.getFontDescriptor().getCapHeight() / 1000 * fontSize;
     }
 }

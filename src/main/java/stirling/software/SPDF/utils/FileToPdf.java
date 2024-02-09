@@ -12,6 +12,8 @@ import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import io.github.pixee.security.ZipSecurity;
+
 import stirling.software.SPDF.model.api.converters.HTMLToPdfRequest;
 import stirling.software.SPDF.utils.ProcessExecutor.ProcessExecutorResult;
 
@@ -144,7 +146,8 @@ public class FileToPdf {
 
     private static Path unzipAndGetMainHtml(byte[] fileBytes) throws IOException {
         Path tempDirectory = Files.createTempDirectory("unzipped_");
-        try (ZipInputStream zipIn = new ZipInputStream(new ByteArrayInputStream(fileBytes))) {
+        try (ZipInputStream zipIn =
+                ZipSecurity.createHardenedInputStream(new ByteArrayInputStream(fileBytes))) {
             ZipEntry entry = zipIn.getNextEntry();
             while (entry != null) {
                 Path filePath = tempDirectory.resolve(entry.getName());
@@ -172,7 +175,7 @@ public class FileToPdf {
 
             // Prioritize 'index.html' if it exists, otherwise use the first .html file
             for (Path htmlFile : htmlFiles) {
-                if (htmlFile.getFileName().toString().equals("index.html")) {
+                if ("index.html".equals(htmlFile.getFileName().toString())) {
                     return htmlFile;
                 }
             }

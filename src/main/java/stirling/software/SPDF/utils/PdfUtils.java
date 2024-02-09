@@ -37,6 +37,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.multipart.MultipartFile;
 
+import io.github.pixee.security.Filenames;
+
 public class PdfUtils {
 
     private static final Logger logger = LoggerFactory.getLogger(PdfUtils.class);
@@ -132,7 +134,7 @@ public class PdfUtils {
         PDFTextStripper textStripper = new PDFTextStripper();
         String pdfText = "";
 
-        if (pagesToCheck == null || pagesToCheck.equals("all")) {
+        if (pagesToCheck == null || "all".equals(pagesToCheck)) {
             pdfText = textStripper.getText(pdfDocument);
         } else {
             // remove whitespaces
@@ -218,8 +220,8 @@ public class PdfUtils {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
             if (singleImage) {
-                if (imageType.toLowerCase().equals("tiff")
-                        || imageType.toLowerCase().equals("tif")) {
+                if ("tiff".equals(imageType.toLowerCase())
+                        || "tif".equals(imageType.toLowerCase())) {
                     // Write the images to the output stream as a TIFF with multiple frames
                     ImageWriter writer = ImageIO.getImageWritersByFormatName("tiff").next();
                     ImageWriteParam param = writer.getDefaultWriteParam();
@@ -299,7 +301,7 @@ public class PdfUtils {
         try (PDDocument doc = new PDDocument()) {
             for (MultipartFile file : files) {
                 String contentType = file.getContentType();
-                String originalFilename = file.getOriginalFilename();
+                String originalFilename = Filenames.toSimpleFileName(file.getOriginalFilename());
                 if (originalFilename != null
                         && (originalFilename.toLowerCase().endsWith(".tiff")
                                 || originalFilename.toLowerCase().endsWith(".tif"))) {
@@ -320,7 +322,7 @@ public class PdfUtils {
                             ImageProcessingUtils.convertColorType(image, colorType);
                     // Use JPEGFactory if it's JPEG since JPEG is lossy
                     PDImageXObject pdImage =
-                            (contentType != null && contentType.equals("image/jpeg"))
+                            (contentType != null && "image/jpeg".equals(contentType))
                                     ? JPEGFactory.createFromImage(doc, convertedImage)
                                     : LosslessFactory.createFromImage(doc, convertedImage);
                     addImageToDocument(doc, pdImage, fitOption, autoRotate);

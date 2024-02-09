@@ -36,6 +36,9 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
+import io.github.pixee.security.Filenames;
+import io.github.pixee.security.ZipSecurity;
+
 import jakarta.servlet.ServletContext;
 import stirling.software.SPDF.SPdfApplication;
 import stirling.software.SPDF.model.PipelineConfig;
@@ -96,7 +99,7 @@ public class PipelineProcessor {
                 for (Resource file : outputFiles) {
                     boolean hasInputFileType = false;
                     for (String extension : inputFileTypes) {
-                        if (extension.equals("ALL") || file.getFilename().endsWith(extension)) {
+                        if ("ALL".equals(extension) || file.getFilename().endsWith(extension)) {
                             hasInputFileType = true;
                             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
                             body.add("fileInput", file);
@@ -333,7 +336,7 @@ public class PipelineProcessor {
                     new ByteArrayResource(file.getBytes()) {
                         @Override
                         public String getFilename() {
-                            return file.getOriginalFilename();
+                            return Filenames.toSimpleFileName(file.getOriginalFilename());
                         }
                     };
             outputFiles.add(fileResource);
@@ -356,7 +359,7 @@ public class PipelineProcessor {
         List<Resource> unzippedFiles = new ArrayList<>();
 
         try (ByteArrayInputStream bais = new ByteArrayInputStream(data);
-                ZipInputStream zis = new ZipInputStream(bais)) {
+                ZipInputStream zis = ZipSecurity.createHardenedInputStream(bais)) {
 
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {

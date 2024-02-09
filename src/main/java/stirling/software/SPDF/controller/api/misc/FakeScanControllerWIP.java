@@ -33,6 +33,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import io.github.pixee.security.Filenames;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -141,7 +142,9 @@ public class FakeScanControllerWIP {
 
         // Return the optimized PDF as a response
         String outputFilename =
-                inputFile.getOriginalFilename().replaceFirst("[.][^.]+$", "") + "_scanned.pdf";
+                Filenames.toSimpleFileName(inputFile.getOriginalFilename())
+                                .replaceFirst("[.][^.]+$", "")
+                        + "_scanned.pdf";
         return WebResponseUtils.boasToWebResponse(baos, outputFilename);
     }
 }
