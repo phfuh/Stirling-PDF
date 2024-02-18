@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html th:lang="${#locale.language}" th:lang-direction="#{language.direction}" xmlns:th="http://www.thymeleaf.org">
+<html th:lang="${#locale.language}" th:lang-direction="#{language.direction}" th:language="${#locale.toString()}" xmlns:th="http://www.thymeleaf.org">
   <head>
   <th:block th:insert="~{fragments/common :: head(title=#{flatten.title}, header=#{flatten.header})}"></th:block>
   </head>
@@ -21,26 +21,26 @@
                 <script src="js/local-pdf-input-download.js"></script>
                 <script>
                   document.getElementById('pdfForm').addEventListener('submit', async (e) => {
-                      e.preventDefault();
+                    e.preventDefault();
 
-                      const { PDFDocument } = PDFLib;
+                    const { PDFDocument } = PDFLib;
 
-                      const processFile = async (file) => {
-                          const origFileUrl = URL.createObjectURL(file);
-                          const formPdfBytes = await fetch(origFileUrl).then(res => res.arrayBuffer());
-                          const pdfDoc = await PDFDocument.load(formPdfBytes, { ignoreEncryption: true });
+                    const processFile = async (file) => {
+                      const origFileUrl = URL.createObjectURL(file);
+                      const formPdfBytes = await fetch(origFileUrl).then(res => res.arrayBuffer());
+                      const pdfDoc = await PDFDocument.load(formPdfBytes, { ignoreEncryption: true });
 
-                          const form = pdfDoc.getForm();
-                          form.flatten();
+                      const form = pdfDoc.getForm();
+                      form.flatten();
 
-                          const pdfBytes = await pdfDoc.save();
-                          const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
-                          const fileName = (file.name ? file.name.replace('.pdf', '') : 'pdf') + '_flattened.pdf';
+                      const pdfBytes = await pdfDoc.save();
+                      const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+                      const fileName = (file.name ? file.name.replace('.pdf', '') : 'pdf') + '_flattened.pdf';
 
-                          return { processedData: pdfBlob, fileName };
-                      };
+                      return { processedData: pdfBlob, fileName };
+                    };
 
-                      await downloadFilesWithCallback(processFile);
+                    await downloadFilesWithCallback(processFile);
                   });
                 </script>
               </form>
